@@ -218,7 +218,10 @@ export default function App() {
         </aside>
       </div>
     </>
-  )function FeedView({ user, posts, setPosts, toast }: { user:User; posts:Post[]; setPosts:(p:Post[])=>void; toast:(m:string)=>void }) {
+  )
+}
+
+    function FeedView({ user, posts, setPosts, toast }: { user:User; posts:Post[]; setPosts:(p:Post[])=>void; toast:(m:string)=>void }) {
   const [text,setText]       = useState('')
   const [type,setType]       = useState('review')
   const [college,setCollege] = useState('')
