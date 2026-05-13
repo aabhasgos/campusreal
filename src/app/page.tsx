@@ -56,7 +56,6 @@ export default function App() {
   const [posts, setPosts]      = useState<Post[]>([])
   const [view, setView]        = useState<'feed'|'explore'|'rankings'|'ask'|'profile'>('feed')
   const { toast, el: toastEl } = useToast()
-
   const [lEmail,setLE] = useState(''); const [lPass,setLP] = useState('')
   const [rName,setRN]  = useState(''); const [rEmail,setRE] = useState('')
   const [rCollege,setRC] = useState(''); const [rYear,setRY] = useState('')
@@ -219,10 +218,7 @@ export default function App() {
         </aside>
       </div>
     </>
-  )
-}
-
-function FeedView({ user, posts, setPosts, toast }: { user:User; posts:Post[]; setPosts:(p:Post[])=>void; toast:(m:string)=>void }) {
+  )function FeedView({ user, posts, setPosts, toast }: { user:User; posts:Post[]; setPosts:(p:Post[])=>void; toast:(m:string)=>void }) {
   const [text,setText]       = useState('')
   const [type,setType]       = useState('review')
   const [college,setCollege] = useState('')
@@ -338,4 +334,160 @@ function PostCard({ post, user, posts, setPosts }: { post:Post; user:User; posts
   )
 }
 
-function ExploreView({ posts }: { posts:Post
+function ExploreView({ posts }: { posts:Post[] }) {
+  const [filtered, setFiltered] = useState<Post[]|null>(null)
+  const [filterName, setFilterName] = useState('')
+  if (filtered !== null) return (
+    <div className="feed">
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div style={{fontFamily:'Syne',fontWeight:700,fontSize:16}}>Posts about {filterName}</div>
+        <button onClick={()=>{setFiltered(null);setFilterName('')}} style={{fontSize:12,background:'var(--border)',border:'none',borderRadius:6,padding:'4px 10px',cursor:'pointer'}}>← Back</button>
+      </div>
+      {filtered.length===0
+        ?<div className="scard" style={{textAlign:'center',color:'var(--muted)'}}>No posts for {filterName} yet. Be the first!</div>
+        :[...filtered].sort((a,b)=>b.ts-a.ts).map(p=><PostCard key={p.id} post={p} user={{id:'',name:'Guest',email:'',college:'',year:'',branch:''}} posts={posts} setPosts={()=>{}}/>)}
+    </div>
+  )
+  return (
+    <div className="scard">
+      <div className="stitle">Explore Colleges</div>
+      <div className="ssub">Tap a college to see all community posts</div>
+      <div className="egrid">
+        {COLLEGES.map(c=>(
+          <div className="etile" key={c.id} onClick={()=>{setFiltered(posts.filter(p=>p.college===c.name));setFilterName(c.name)}}>
+            <div className="eabbr">{c.short}</div>
+            <div className="etname">{c.name}</div>
+            <div className="etsub">{c.city} · {c.type}</div>
+            <div style={{marginTop:9,fontSize:12}}>⭐ {c.rating}/5</div>
+            <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>JEE cutoff ≈ {c.cutoff}%ile</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function RankingsView() {
+  const [result, setResult] = useState('')
+  const [loading, setLoading] = useState(false)
+  useEffect(() => {
+    setLoading(true)
+    callAI('Rank top 8 Indian engineering colleges based on student satisfaction, real placements & campus life. Numbered list: "1. College — reason (honest about drawbacks too)". Be concise.','You give honest unbiased rankings of Indian colleges.')
+      .then(setResult).finally(()=>setLoading(false))
+  }, [])
+  return (
+    <div className="scard">
+      <div className="stitle">🏆 AI + Community Rankings</div>
+      <div className="ssub">Honest rankings based on real student outcomes, not sponsorships</div>
+      {loading?<div style={{color:'var(--muted)',fontSize:13}}><span className="spin"/>Generating live rankings…</div>
+        :<div style={{fontSize:14,lineHeight:2,whiteSpace:'pre-wrap'}}>{result}</div>}
+    </div>
+  )
+}
+
+function AskSeniorsView({ posts }: { posts:Post[] }) {
+  const [q,setQ]       = useState('')
+  const [ans,setAns]   = useState('')
+  const [loading,setL] = useState(false)
+  async function ask() {
+    if (!q.trim()) return
+    setL(true); setAns('')
+    const ctx = posts.filter(p=>['review','tip'].includes(p.type)).slice(0,6).map(p=>`[${p.college}]: ${p.text}`).join('\n')
+    const r = await callAI(`Student question: "${q}"\n\nCommunity posts:\n${ctx}\n\nAnswer using community insights and your knowledge. Be specific, honest, practical.`,'You are a senior student counselor on CampusReal. Give honest direct answers about Indian colleges.')
+    setAns(r); setL(false)
+  }
+  return (
+    <div className="scard">
+      <div className="stitle">Ask Seniors</div>
+      <div className="ssub">AI pulls insights from the community to answer your questions honestly</div>
+      <textarea className="ptxt" style={{height:100}} value={q} onChange={e=>setQ(e.target.value)} placeholder="e.g. Is hostel worth it at NIT Trichy? What's the real placement scenario for ECE at VIT?"/>
+      <button className="pbtn" style={{marginTop:10,padding:'10px 22px'}} onClick={ask} disabled={loading}>{loading?<><span className="spin"/>Finding insights…</>:'Ask the Community ✦'}</button>
+      {ans&&<div className="aibox" style={{marginTop:16}}>{ans}</div>}
+    </div>
+  )
+}
+
+function ProfileView({ user, posts }: { user:User; posts:Post[] }) {
+  const myPosts = posts.filter(p=>p.uid===user.id)
+  return (
+    <div className="scard">
+      <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:22}}>
+        <div style={{width:70,height:70,borderRadius:'50%',background:gc(user.name),display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Syne',fontWeight:700,fontSize:22,color:'#fff'}}>{ini(user.name)}</div>
+        <div>
+          <div style={{fontFamily:'Syne',fontWeight:700,fontSize:20}}>{user.name}</div>
+          <div style={{color:'var(--muted)',fontSize:13,marginTop:4}}>{user.college}</div>
+          <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>{user.year}{user.branch?' · '+user.branch:''}</div>
+        </div>
+      </div>
+      <div className="pmini">
+        {[['Posts',myPosts.length],['Likes',myPosts.reduce((s,p)=>s+p.likes,0)],['Replies',myPosts.reduce((s,p)=>s+(p.comments?.length||0),0)]].map(([l,n])=>
+          <div className="pmini-box" key={String(l)}><div className="pmini-num">{n}</div><div className="pmini-lbl">{l}</div></div>)}
+      </div>
+      <div style={{fontFamily:'Syne',fontWeight:600,fontSize:14,marginBottom:12}}>My Posts</div>
+      {myPosts.length
+        ?myPosts.map(p=><div key={p.id} style={{background:'var(--bg)',borderRadius:9,padding:13,marginBottom:10,fontSize:13,lineHeight:1.7,borderLeft:'3px solid var(--brand2)'}}>{p.text}<div style={{fontSize:11,color:'var(--muted)',marginTop:7}}>{ago(p.ts)} · ❤ {p.likes}</div></div>)
+        :<div style={{color:'var(--muted)',fontSize:13}}>No posts yet. Share your campus reality!</div>}
+    </div>
+  )
+}
+
+function JeeMatcher() {
+  const [exam,setExam]   = useState('JEE Mains')
+  const [pct,setPct]     = useState('')
+  const [results,setRes] = useState<{name:string;type:string;city:string;chance:string;detail:string}[]>([])
+  const [loading,setL]   = useState(false)
+  async function match() {
+    const p = parseFloat(pct)
+    if (!p||p<0||p>100) return
+    setL(true); setRes([])
+    const ans = await callAI(`Student scored ${p} percentile in ${exam}. List exactly 4 realistic Indian colleges. Return ONLY a JSON array: [{"name":"...","type":"IIT/NIT/Deemed/State","city":"...","chance":"High/Medium/Low","detail":"one honest line"}]`,'You are an expert on Indian college admissions. Be accurate and realistic.')
+    try { setRes(JSON.parse(ans.replace(/```json|```/g,'').trim())) } catch { setRes([]) }
+    setL(false)
+  }
+  const cc = (c: string) => c==='High'?'#10b981':c==='Medium'?'#f5a623':'#e94560'
+  const cw = (c: string) => c==='High'?85:c==='Medium'?55:30
+  return (
+    <div className="rcard">
+      <div className="rtitle"><i className="ti ti-calculator"/>JEE / NEET Matcher</div>
+      <div style={{fontSize:12,color:'var(--muted)',marginBottom:10}}>Enter percentile → see colleges you can get</div>
+      <div className="jrow">
+        <select className="jinp" value={exam} onChange={e=>setExam(e.target.value)} style={{maxWidth:110}}>
+          <option>JEE Mains</option><option>JEE Advanced</option><option>NEET</option><option>BITSAT</option>
+        </select>
+        <input className="jinp" type="number" value={pct} onChange={e=>setPct(e.target.value)} placeholder="Percentile" style={{maxWidth:85}}/>
+        <button className="jbtn" onClick={match} disabled={loading}>{loading?'…':'Find →'}</button>
+      </div>
+      {loading&&<div style={{fontSize:12,color:'var(--muted)'}}><span className="spin"/>Finding colleges…</div>}
+      {results.map((c,i)=>(
+        <div className="cres" key={i}>
+          <div className="cresname">{c.name}</div>
+          <div className="cressub">{c.city} · {c.type} · <strong style={{color:cc(c.chance)}}>{c.chance} chance</strong></div>
+          <div className="cressub" style={{marginTop:3}}>{c.detail}</div>
+          <div className="cbar"><div className="cfill" style={{width:cw(c.chance)+'%'}}/></div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function AICounselor() {
+  const [q,setQ]       = useState('')
+  const [ans,setAns]   = useState('')
+  const [loading,setL] = useState(false)
+  async function ask() {
+    if (!q.trim()) return
+    setL(true); setAns('')
+    const r = await callAI(q,'You are an honest knowledgeable Indian college counselor. Give practical direct advice about IITs, NITs, BITS and other Indian colleges. Be specific and realistic in 3-5 sentences.')
+    setAns(r); setL(false)
+  }
+  return (
+    <div className="rcard">
+      <div className="rtitle"><i className="ti ti-robot"/>AI Counselor</div>
+      <div style={{fontSize:12,color:'var(--muted)',marginBottom:9}}>Instant honest answers about admissions & colleges</div>
+      <textarea className="ptarea" value={q} onChange={e=>setQ(e.target.value)} placeholder="Which is better for CSE — NIT Trichy or BITS Pilani?"/>
+      <button className="pbtn2" onClick={ask} disabled={loading}>{loading?<><span className="spin"/>Thinking…</>:'Ask AI ✦'}</button>
+      {ans&&<div className="aibox">{ans}</div>}
+    </div>
+  )
+        }
+  }
