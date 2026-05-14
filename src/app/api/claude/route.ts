@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   try {
     const genAI = new GoogleGenerativeAI(key)
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.0-flash',
       systemInstruction: system ?? 'You are a helpful AI assistant for CampusReal, an honest Indian student college community.',
     })
     const result = await model.generateContent(prompt)
