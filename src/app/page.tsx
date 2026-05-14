@@ -34,12 +34,11 @@ type Post = {id:string;uid:string;college:string;type:string;text:string;likes:n
 
 async function ai(prompt: string, system?: string): Promise<string> {
   try {
-    const r = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,system}),signal:AbortSignal.timeout(25000)})
+    const r = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,system})})
     const d = await r.json()
     if(!r.ok) throw new Error(d.error||'AI error')
     return d.text as string
   } catch(e:unknown) {
-    if(e instanceof Error && e.name==='TimeoutError') return 'Request timed out. Please try again.'
     return 'AI unavailable right now. Please try again in a moment.'
   }
 }
@@ -59,15 +58,22 @@ export default function App() {
   const [view, setView] = useState<'feed'|'explore'|'rank'|'ask'|'profile'>('feed')
   const [toast, setToast] = useState('')
   const [toastOn, setToastOn] = useState(false)
-  const [le,setLE]=useState(''); const [lp,setLP]=useState('')
-  const [rn,setRN]=useState(''); const [re,setRE]=useState('')
-  const [rc,setRC]=useState(''); const [ry,setRY]=useState('')
-  const [rb,setRB]=useState(''); const [rp,setRP]=useState('')
+  const [le,setLE]=useState('')
+  const [lp,setLP]=useState('')
+  const [rn,setRN]=useState('')
+  const [re,setRE]=useState('')
+  const [rc,setRC]=useState('')
+  const [ry,setRY]=useState('')
+  const [rb,setRB]=useState('')
+  const [rp,setRP]=useState('')
   const [al,setAL]=useState(false)
 
-  function showToast(m: string){setToast(m);setToastOn(true);setTimeout(()=>setToastOn(false),2800)}
+  function showToast(m: string) {
+    setToast(m)
+    setToastOn(true)
+    setTimeout(()=>setToastOn(false),2800)
+  }
 
-  // Load saved session on startup
   useEffect(()=>{
     try {
       const saved = localStorage.getItem('cr_user')
@@ -76,7 +82,9 @@ export default function App() {
   },[])
 
   useEffect(()=>{
-    if(page==='app') fetch('/api/storage?resource=posts').then(r=>r.json()).then(setPosts).catch(()=>{})
+    if(page==='app') {
+      fetch('/api/storage?resource=posts').then(r=>r.json()).then(setPosts).catch(()=>{})
+    }
   },[page])
 
   function saveUser(u: User) {
@@ -90,68 +98,70 @@ export default function App() {
     setPage('land')
   }
 
-  async function doLogin(){
+  async function doLogin() {
     setAL(true)
-    try{
+    try {
       const d = await db({action:'login',email:le,pass:lp})
-      saveUser(d.user); setPage('app')
-    }catch(e:unknown){showToast(e instanceof Error&&e.message.includes('Invalid')?'Wrong email/password — try rohan@demo.com / demo':'Login failed')}
+      saveUser(d.user)
+      setPage('app')
+    } catch(e:unknown) {
+      showToast(e instanceof Error && e.message.includes('Invalid') ? 'Wrong email/password' : 'Login failed')
+    }
     setAL(false)
   }
 
-  async function doReg(){
-    if(!rn||!re||!rc||!ry||!rp){showToast('Please fill all fields');return}
+  async function doReg() {
+    if(!rn||!re||!rc||!ry||!rp) { showToast('Please fill all fields'); return }
     setAL(true)
-    try{
+    try {
       const d = await db({action:'register',name:rn,email:re,college:rc,year:ry,branch:rb,pass:rp})
-      saveUser(d.user); setPage('app'); showToast('Welcome '+rn+'! 🎉')
-    }catch(e:unknown){showToast(e instanceof Error?e.message:'Registration failed')}
+      saveUser(d.user)
+      setPage('app')
+      showToast('Welcome '+rn+'!')
+    } catch(e:unknown) {
+      showToast(e instanceof Error ? e.message : 'Registration failed')
+    }
     setAL(false)
   }
 
   if(page==='land') return (
-    <>
+    <div>
       <div className={`toast${toastOn?' show':''}`}>{toast}</div>
-      <nav className="nav"><div className="logo">Campus<em>Real</em></div>
+      <nav className="nav">
+        <div className="logo">Campus<em>Real</em></div>
         <div className="nav-right">
           <button className="nbtn" onClick={()=>{setTab('login');setPage('auth')}}>Sign In</button>
           <button className="nbtn p" onClick={()=>{setTab('reg');setPage('auth')}}>Join Free</button>
         </div>
       </nav>
       <div className="hero">
-        <h1 className="hero-h">The <em>Real</em> Guide<br/>to Indian Colleges</h1>
+        <h1 className="hero-h">The <em>Real</em> Guide to Indian Colleges</h1>
         <p className="hero-p">Seniors share honest campus reviews. Juniors get real answers. AI helps you find the right college for your JEE / NEET score.</p>
         <div className="hctas">
           <button className="hcta f" onClick={()=>{setTab('reg');setPage('auth')}}>Join as Student</button>
           <button className="hcta o" onClick={()=>{setTab('reg');setPage('auth')}}>Share Your Experience</button>
         </div>
         <div className="hstats">
-          {[['12K+','Students'],['800+','Colleges'],['50K+','Reviews']].map(([n,l])=>(
-            <div key={l} style={{textAlign:'center'}}><div className="hstat-num">{n}</div><div className="hstat-lbl">{l}</div></div>
-          ))}
+          <div style={{textAlign:'center'}}><div className="hstat-num">12K+</div><div className="hstat-lbl">Students</div></div>
+          <div style={{textAlign:'center'}}><div className="hstat-num">800+</div><div className="hstat-lbl">Colleges</div></div>
+          <div style={{textAlign:'center'}}><div className="hstat-num">50K+</div><div className="hstat-lbl">Reviews</div></div>
         </div>
         <div className="hfeats">
-          {[['ti-school','Honest Reviews','Seniors share placement reality, hostel life, faculty — no sugar coating.'],
-            ['ti-robot','AI College Matcher','Enter your JEE/NEET percentile and get colleges you can actually target.'],
-            ['ti-messages','Ask Seniors','AI surfaces the most relevant senior insights instantly.'],
-            ['ti-trophy','Community Rankings','Student-powered rankings based on real experience, not sponsorships.'],
-          ].map(([icon,t,d])=>(
-            <div className="hfeat" key={t}>
-              <div className="hfeat-icon"><i className={`ti ${icon}`}/></div>
-              <div className="hfeat-t">{t}</div>
-              <div className="hfeat-d">{d}</div>
-            </div>
-          ))}
+          <div className="hfeat"><div className="hfeat-icon"><i className="ti ti-school"/></div><div className="hfeat-t">Honest Reviews</div><div className="hfeat-d">Seniors share placement reality, hostel life, faculty — no sugar coating.</div></div>
+          <div className="hfeat"><div className="hfeat-icon"><i className="ti ti-robot"/></div><div className="hfeat-t">AI College Matcher</div><div className="hfeat-d">Enter your JEE/NEET percentile and get colleges you can actually target.</div></div>
+          <div className="hfeat"><div className="hfeat-icon"><i className="ti ti-messages"/></div><div className="hfeat-t">Ask Seniors</div><div className="hfeat-d">AI surfaces the most relevant senior insights instantly.</div></div>
+          <div className="hfeat"><div className="hfeat-icon"><i className="ti ti-trophy"/></div><div className="hfeat-t">Community Rankings</div><div className="hfeat-d">Student-powered rankings based on real experience, not sponsorships.</div></div>
         </div>
       </div>
-    </>
+    </div>
   )
 
   if(page==='auth') return (
-    <>
+    <div>
       <div className={`toast${toastOn?' show':''}`}>{toast}</div>
-      <nav className="nav"><div className="logo">Campus<em>Real</em></div>
-        <div className="nav-right"><button className="nbtn" onClick={()=>setPage('land')}>← Back</button></div>
+      <nav className="nav">
+        <div className="logo">Campus<em>Real</em></div>
+        <div className="nav-right"><button className="nbtn" onClick={()=>setPage('land')}>Back</button></div>
       </nav>
       <div className="awrap">
         <div className="acard">
@@ -161,34 +171,39 @@ export default function App() {
             <button className={`atab${tab==='login'?' act':''}`} onClick={()=>setTab('login')}>Sign In</button>
             <button className={`atab${tab==='reg'?' act':''}`} onClick={()=>setTab('reg')}>Join Free</button>
           </div>
-          {tab==='login'?(
-            <>
+          {tab==='login' ? (
+            <div>
               <div className="fg"><label className="fl">Email</label><input className="fi" type="email" value={le} onChange={e=>setLE(e.target.value)} placeholder="your@email.com"/></div>
-              <div className="fg"><label className="fl">Password</label><input className="fi" type="password" value={lp} onChange={e=>setLP(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&doLogin()}/></div>
-              <button className="abtn" onClick={doLogin} disabled={al}>{al?'Signing in…':'Sign In'}</button>
+              <div className="fg"><label className="fl">Password</label><input className="fi" type="password" value={lp} onChange={e=>setLP(e.target.value)} placeholder="password" onKeyDown={e=>e.key==='Enter'&&doLogin()}/></div>
+              <button className="abtn" onClick={doLogin} disabled={al}>{al?'Signing in...':'Sign In'}</button>
               <div className="asw">New here? <a onClick={()=>setTab('reg')}>Create account</a></div>
               <div style={{marginTop:12,padding:10,background:'#f0f9ff',borderRadius:9,fontSize:12,color:'#0369a1'}}>Demo: <strong>rohan@demo.com</strong> / <strong>demo</strong></div>
-            </>
-          ):(
-            <>
+            </div>
+          ) : (
+            <div>
               <div className="fg"><label className="fl">Full Name</label><input className="fi" value={rn} onChange={e=>setRN(e.target.value)} placeholder="Arjun Sharma"/></div>
               <div className="fg"><label className="fl">Email</label><input className="fi" type="email" value={re} onChange={e=>setRE(e.target.value)} placeholder="your@email.com"/></div>
-              <div className="fg"><label className="fl">College</label><input className="fi" value={rc} onChange={e=>setRC(e.target.value)} placeholder="IIT Bombay, NIT Trichy, Thapar…"/></div>
+              <div className="fg"><label className="fl">College</label><input className="fi" value={rc} onChange={e=>setRC(e.target.value)} placeholder="IIT Bombay, Thapar, VIT..."/></div>
               <div className="fg"><label className="fl">Year</label>
                 <select className="fs" value={ry} onChange={e=>setRY(e.target.value)}>
                   <option value="">Select year</option>
-                  {['1st Year','2nd Year','3rd Year','4th Year','Graduated','Aspiring (12th / Drop)'].map(y=><option key={y}>{y}</option>)}
+                  <option>1st Year</option>
+                  <option>2nd Year</option>
+                  <option>3rd Year</option>
+                  <option>4th Year</option>
+                  <option>Graduated</option>
+                  <option>Aspiring (12th / Drop)</option>
                 </select>
               </div>
-              <div className="fg"><label className="fl">Branch</label><input className="fi" value={rb} onChange={e=>setRB(e.target.value)} placeholder="Computer Science, Mechanical…"/></div>
-              <div className="fg"><label className="fl">Password</label><input className="fi" type="password" value={rp} onChange={e=>setRP(e.target.value)} placeholder="••••••••"/></div>
-              <button className="abtn" onClick={doReg} disabled={al}>{al?'Creating…':'Create Account'}</button>
+              <div className="fg"><label className="fl">Branch</label><input className="fi" value={rb} onChange={e=>setRB(e.target.value)} placeholder="Computer Science, Mechanical..."/></div>
+              <div className="fg"><label className="fl">Password</label><input className="fi" type="password" value={rp} onChange={e=>setRP(e.target.value)} placeholder="password"/></div>
+              <button className="abtn" onClick={doReg} disabled={al}>{al?'Creating...':'Create Account'}</button>
               <div className="asw">Already have an account? <a onClick={()=>setTab('login')}>Sign In</a></div>
-            </>
+            </div>
           )}
         </div>
       </div>
-    </>
+    </div>
   )
 
   const trending = Object.entries(
@@ -196,7 +211,7 @@ export default function App() {
   ).sort((a,b)=>b[1]-a[1]).slice(0,5)
 
   return (
-    <>
+    <div>
       <div className={`toast${toastOn?' show':''}`}>{toast}</div>
       <nav className="nav">
         <div className="logo">Campus<em>Real</em></div>
@@ -214,12 +229,11 @@ export default function App() {
             <div className="upill">{user!.year}{user!.branch?' · '+user!.branch:''}</div>
           </div>
           <nav className="snav">
-            {(['feed','explore','rank','ask','profile'] as const).map(v=>(
-              <button key={v} className={`snav-btn${view===v?' act':''}`} onClick={()=>setView(v)}>
-                <i className={`ti ti-${{feed:'home',explore:'compass',rank:'trophy',ask:'message-question',profile:'user'}[v]}`}/>
-                {{feed:'Home Feed',explore:'Explore Colleges',rank:'AI Rankings',ask:'Ask Seniors',profile:'My Profile'}[v]}
-              </button>
-            ))}
+            <button className={`snav-btn${view==='feed'?' act':''}`} onClick={()=>setView('feed')}><i className="ti ti-home"/>Home Feed</button>
+            <button className={`snav-btn${view==='explore'?' act':''}`} onClick={()=>setView('explore')}><i className="ti ti-compass"/>Explore Colleges</button>
+            <button className={`snav-btn${view==='rank'?' act':''}`} onClick={()=>setView('rank')}><i className="ti ti-trophy"/>AI Rankings</button>
+            <button className={`snav-btn${view==='ask'?' act':''}`} onClick={()=>setView('ask')}><i className="ti ti-message-question"/>Ask Seniors</button>
+            <button className={`snav-btn${view==='profile'?' act':''}`} onClick={()=>setView('profile')}><i className="ti ti-user"/>My Profile</button>
           </nav>
         </aside>
         <main className="feed">
@@ -233,7 +247,7 @@ export default function App() {
           <Matcher/>
           <div className="rcard">
             <div className="rtitle"><i className="ti ti-trending-up"/>Trending</div>
-            {trending.length===0&&<div style={{fontSize:13,color:'var(--muted)'}}>No posts yet — be the first!</div>}
+            {trending.length===0 && <div style={{fontSize:13,color:'var(--muted)'}}>No posts yet</div>}
             {trending.map(([name,score],i)=>(
               <div className="trow" key={name}>
                 <div className="tnum">{i+1}</div>
@@ -244,7 +258,7 @@ export default function App() {
           <Counselor/>
         </aside>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -253,42 +267,44 @@ function Feed({user,posts,setPosts,showToast}:{user:User;posts:Post[];setPosts:(
   const [type,setType]=useState('review')
   const [college,setCollege]=useState('')
   const [busy,setBusy]=useState(false)
-
-  // Include preset + user's own college + colleges from posts — no duplicates
-  const cols=[...new Set([...PRESET_COLLEGES, user.college, ...posts.map(p=>p.college)])].filter(Boolean).sort()
+  const cols=[...new Set([...PRESET_COLLEGES,user.college,...posts.map(p=>p.college)])].filter(Boolean).sort()
 
   async function post() {
-    if(!text.trim()){showToast('Write something first!');return}
+    if(!text.trim()) { showToast('Write something first!'); return }
     setBusy(true)
-    try{
-      const enhanced = await ai(`Student at ${user.college} posted this ${type}: "${text}". If under 40 words expand slightly keeping their voice, else return unchanged. Return ONLY the post text.`)
+    try {
+      const enhanced = await ai('Student at '+user.college+' posted this '+type+': "'+text+'". If under 40 words expand slightly keeping their voice, else return unchanged. Return ONLY the post text.')
       const np:Post={id:'p'+Date.now(),uid:user.id,college:college||user.college,type,text:enhanced,likes:0,likedBy:[],comments:[],ts:Date.now()}
       await db({action:'createPost',post:np})
-      setPosts([np,...posts]); setText(''); showToast('Posted! 🎉')
-    }catch{showToast('Post failed. Try again.')}
+      setPosts([np,...posts])
+      setText('')
+      showToast('Posted!')
+    } catch {
+      showToast('Post failed. Try again.')
+    }
     setBusy(false)
   }
 
   return (
-    <>
+    <div>
       <div className="pbox">
         <textarea className="ptxt" value={text} onChange={e=>setText(e.target.value)} placeholder="Share your campus reality — placements, hostel life, faculty, anything honest!"/>
         <div className="pmeta">
           <select className="sel" value={type} onChange={e=>setType(e.target.value)}>
-            <option value="review">📝 Review</option>
-            <option value="qa">❓ Question</option>
-            <option value="tip">💡 Tip</option>
-            <option value="rank">🏆 Ranking</option>
+            <option value="review">Review</option>
+            <option value="qa">Question</option>
+            <option value="tip">Tip</option>
+            <option value="rank">Ranking</option>
           </select>
           <select className="sel" value={college} onChange={e=>setCollege(e.target.value)} style={{maxWidth:155}}>
             <option value="">My College</option>
             {cols.map(c=><option key={c} value={c}>{c}</option>)}
           </select>
-          <button className="pbtn" onClick={post} disabled={busy}>{busy?'Posting…':'Post →'}</button>
+          <button className="pbtn" onClick={post} disabled={busy}>{busy?'Posting...':'Post'}</button>
         </div>
       </div>
       {[...posts].sort((a,b)=>b.ts-a.ts).map(p=><Card key={p.id} post={p} user={user} posts={posts} setPosts={setPosts}/>)}
-    </>
+    </div>
   )
 }
 
@@ -298,7 +314,7 @@ function Card({post,user,posts,setPosts}:{post:Post;user:User;posts:Post[];setPo
   const [sum,setSum]=useState('')
   const [sl,setSL]=useState(false)
   const [cl,setCL]=useState(false)
-  const tagMap:Record<string,string>={review:'📝 Review',qa:'❓ Question',tip:'💡 Tip',rank:'🏆 Ranking'}
+  const tagMap:Record<string,string>={review:'Review',qa:'Question',tip:'Tip',rank:'Ranking'}
   const tagCls:Record<string,string>={review:'tr',qa:'tq',tip:'tt',rank:'tk'}
   const liked=post.likedBy?.includes(user.id)
 
@@ -317,9 +333,10 @@ function Card({post,user,posts,setPosts}:{post:Post;user:User;posts:Post[];setPo
       await db({action:'addComment',postId:post.id,comment:uc})
       const updated=[...(post.comments||[]),uc]
       setPosts(posts.map(p=>p.id===post.id?{...p,comments:updated}:p))
+      const question=ct
       setCT('')
-      if(ct.includes('?')){
-        const rep = await ai(`Post from ${post.college}: "${post.text}"\nStudent asks: "${ct}"\nGive a brief honest 2-3 sentence reply as an experienced senior.`)
+      if(question.includes('?')) {
+        const rep = await ai('Post from '+post.college+': "'+post.text+'"\nStudent asks: "'+question+'"\nGive a brief honest 2-3 sentence reply as an experienced senior.')
         const ac:Comment={author:'AI Counselor',text:rep,ts:Date.now(),isAI:true}
         await db({action:'addComment',postId:post.id,comment:ac})
         setPosts(posts.map(p=>p.id===post.id?{...p,comments:[...updated,ac]}:p))
@@ -330,8 +347,9 @@ function Card({post,user,posts,setPosts}:{post:Post;user:User;posts:Post[];setPo
 
   async function summarize() {
     setSL(true)
-    const s = await ai(`Summarize in 2 bullet points starting with •, max 15 words each:\n"${post.text}"`)
-    setSum(s); setSL(false)
+    const s = await ai('Summarize in 2 bullet points starting with bullet, max 15 words each: "'+post.text+'"')
+    setSum(s)
+    setSL(false)
   }
 
   return (
@@ -345,50 +363,67 @@ function Card({post,user,posts,setPosts}:{post:Post;user:User;posts:Post[];setPo
         <span className={`tbadge ${tagCls[post.type]||'tr'}`}>{tagMap[post.type]||'Post'}</span>
       </div>
       <div className="pbody">
-        {post.text}
-        {sum&&<div style={{background:'#f5f3ff',borderRadius:9,padding:'10px 12px',marginTop:10,fontSize:13,lineHeight:1.7,borderLeft:'3px solid #7c3aed',whiteSpace:'pre-wrap'}}><div style={{fontSize:11,fontWeight:600,color:'#4c1d95',marginBottom:4}}>✦ KEY TAKEAWAYS</div>{sum}</div>}
+        <div>{post.text}</div>
+        {sum && (
+          <div style={{background:'#f5f3ff',borderRadius:9,padding:'10px 12px',marginTop:10,fontSize:13,lineHeight:1.7,borderLeft:'3px solid #7c3aed',whiteSpace:'pre-wrap'}}>
+            <div style={{fontSize:11,fontWeight:600,color:'#4c1d95',marginBottom:4}}>KEY TAKEAWAYS</div>
+            {sum}
+          </div>
+        )}
       </div>
       <div className="pfooter">
-        <button className={`pact${liked?' liked':''}`} onClick={like}><i className={`ti ${liked?'ti-heart-filled':'ti-heart'}`}/>{post.likes}</button>
-        <button className="pact" onClick={()=>setShowC(!showC)}><i className="ti ti-message-circle"/>{post.comments?.length||0} Comments</button>
-        <button className="pact" onClick={summarize} disabled={sl}>{sl?<><span className="spin"/>Reading…</>:<><i className="ti ti-sparkles"/>AI TL;DR</>}</button>
+        <button className={`pact${liked?' liked':''}`} onClick={like}>
+          <i className={`ti ${liked?'ti-heart-filled':'ti-heart'}`}/>{post.likes}
+        </button>
+        <button className="pact" onClick={()=>setShowC(!showC)}>
+          <i className="ti ti-message-circle"/>{post.comments?.length||0} Comments
+        </button>
+        <button className="pact" onClick={summarize} disabled={sl}>
+          <i className="ti ti-sparkles"/>{sl?'Reading...':'AI TL;DR'}
+        </button>
       </div>
-      {showC&&(
+      {showC && (
         <div className="carea">
           {(post.comments||[]).map((c,i)=>(
             <div className="crow" key={i}>
               <div className="cav" style={{background:gc(c.author)}}>{ini(c.author)}</div>
-              <div className="cbody"><div className="cauth">{c.author}{c.isAI&&<span className="ailabel">AI</span>}</div>{c.text}</div>
+              <div className="cbody">
+                <div className="cauth">{c.author}{c.isAI && <span className="ailabel">AI</span>}</div>
+                {c.text}
+              </div>
             </div>
           ))}
           <div className="cinrow">
-            <input className="cinput" value={ct} onChange={e=>setCT(e.target.value)} placeholder="Ask or comment… questions get AI replies" onKeyDown={e=>e.key==='Enter'&&comment()}/>
-            <button className="csend" onClick={comment} disabled={cl}>{cl?'…':'Send'}</button>
+            <input className="cinput" value={ct} onChange={e=>setCT(e.target.value)} placeholder="Ask or comment..." onKeyDown={e=>e.key==='Enter'&&comment()}/>
+            <button className="csend" onClick={comment} disabled={cl}>{cl?'...':'Send'}</button>
           </div>
         </div>
       )}
     </div>
   )
 }
+
 function Explore({posts}:{posts:Post[]}) {
   const [filtered,setFiltered]=useState<Post[]|null>(null)
   const [name,setName]=useState('')
-  if(filtered!==null) return (
-    <div className="feed">
-      <div style={{display:'flex',alignItems:'center',gap:10}}>
-        <div style={{fontFamily:'Syne',fontWeight:700,fontSize:16}}>Posts about {name}</div>
-        <button onClick={()=>{setFiltered(null);setName('')}} style={{fontSize:12,background:'var(--border)',border:'none',borderRadius:6,padding:'4px 10px',cursor:'pointer'}}>
-          Back
-        </button>
+
+  if(filtered!==null) {
+    return (
+      <div className="feed">
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+          <div style={{fontFamily:'Syne',fontWeight:700,fontSize:16}}>Posts about {name}</div>
+          <button onClick={()=>{setFiltered(null);setName('')}} style={{fontSize:12,background:'var(--border)',border:'none',borderRadius:6,padding:'4px 10px',cursor:'pointer'}}>Back</button>
+        </div>
+        {filtered.length===0 && (
+          <div className="scard" style={{textAlign:'center',color:'var(--muted)'}}>No posts yet for {name}. Be the first!</div>
+        )}
+        {[...filtered].sort((a,b)=>b.ts-a.ts).map(p=>(
+          <Card key={p.id} post={p} user={{id:'',name:'Guest',email:'',college:'',year:'',branch:''}} posts={posts} setPosts={()=>{}}/>
+        ))}
       </div>
-      {filtered.length===0
-        ? <div className="scard" style={{textAlign:'center',color:'var(--muted)'}}>No posts yet for {name}. Be the first!</div>
-        : [...filtered].sort((a,b)=>b.ts-a.ts).map(p=>(
-            <Card key={p.id} post={p} user={{id:'',name:'Guest',email:'',college:'',year:'',branch:''}} posts={posts} setPosts={()=>{}}/>
-          ))
-      }
-    </div>
-  )
+    )
+  }
+
   return (
     <div className="scard">
       <div className="stitle">Explore Colleges</div>
@@ -398,9 +433,9 @@ function Explore({posts}:{posts:Post[]}) {
           <div className="etile" key={c.id} onClick={()=>{setFiltered(posts.filter(p=>p.college===c.name));setName(c.name)}}>
             <div className="eabbr">{c.short}</div>
             <div className="etname">{c.name}</div>
-            <div className="etsub">{c.city} · {c.type}</div>
-            <div style={{marginTop:9,fontSize:12}}>⭐ {c.rating}/5</div>
-            <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>JEE cutoff ~ {c.cutoff}%ile</div>
+            <div className="etsub">{c.city} - {c.type}</div>
+            <div style={{marginTop:9,fontSize:12}}>Stars: {c.rating}/5</div>
+            <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>JEE cutoff approx {c.cutoff} percentile</div>
           </div>
         ))}
       </div>
@@ -414,10 +449,15 @@ function Rankings() {
   const [error,setError]=useState('')
 
   async function load() {
-    setLoading(true); setError(''); setResult('')
-    const r = await ai('Rank top 8 Indian engineering colleges based on student satisfaction, real placements & campus life. Numbered list: "1. College — reason". Be concise and honest about drawbacks too.')
-    if(r.includes('unavailable')||r.includes('timed out')) { setError(r) }
-    else { setResult(r) }
+    setLoading(true)
+    setError('')
+    setResult('')
+    const r = await ai('Rank top 8 Indian engineering colleges based on student satisfaction, real placements and campus life. Use numbered list format like: 1. College name - reason why. Be honest about drawbacks too. Keep each point to 1-2 sentences.')
+    if(r.includes('unavailable')) {
+      setError(r)
+    } else {
+      setResult(r)
+    }
     setLoading(false)
   }
 
@@ -425,11 +465,16 @@ function Rankings() {
 
   return (
     <div className="scard">
-      <div className="stitle">🏆 AI + Community Rankings</div>
+      <div className="stitle">AI + Community Rankings</div>
       <div className="ssub">Honest rankings based on real student outcomes, not sponsorships</div>
-      {loading&&<div style={{color:'var(--muted)',fontSize:13}}><span className="spin"/>Generating live rankings… (may take 10-15 seconds)</div>}
-      {error&&<div style={{color:'var(--muted)',fontSize:13}}>{error} <button onClick={load} style={{color:'var(--brand2)',background:'none',border:'none',cursor:'pointer',fontWeight:600}}>Try again →</button></div>}
-      {result&&<div style={{fontSize:14,lineHeight:2,whiteSpace:'pre-wrap'}}>{result}</div>}
+      {loading && <div style={{color:'var(--muted)',fontSize:13}}><span className="spin"/> Generating rankings... this may take 15 seconds</div>}
+      {error && (
+        <div>
+          <div style={{color:'var(--muted)',fontSize:13,marginBottom:8}}>{error}</div>
+          <button onClick={load} style={{color:'var(--brand2)',background:'none',border:'1px solid var(--brand2)',borderRadius:8,padding:'6px 14px',cursor:'pointer',fontWeight:600,fontSize:13}}>Try Again</button>
+        </div>
+      )}
+      {result && <div style={{fontSize:14,lineHeight:2,whiteSpace:'pre-wrap'}}>{result}</div>}
     </div>
   )
 }
@@ -438,22 +483,26 @@ function AskSeniors({posts}:{posts:Post[]}) {
   const [q,setQ]=useState('')
   const [ans,setAns]=useState('')
   const [loading,setL]=useState(false)
+
   async function ask() {
     if(!q.trim()) return
-    setL(true); setAns('')
-    const ctx=posts.filter(p=>['review','tip'].includes(p.type)).slice(0,6).map(p=>`[${p.college}]: ${p.text}`).join('\n')
-    const r=await ai(`Student question: "${q}"\n\nCommunity posts for context:\n${ctx}\n\nAnswer using community insights and your knowledge of Indian colleges. Be specific, honest, practical.`)
-    setAns(r); setL(false)
+    setL(true)
+    setAns('')
+    const ctx=posts.filter(p=>['review','tip'].includes(p.type)).slice(0,6).map(p=>'['+p.college+']: '+p.text).join('\n')
+    const r=await ai('Student question: "'+q+'"\n\nCommunity posts for context:\n'+ctx+'\n\nAnswer using community insights and your knowledge of Indian colleges. Be specific, honest, practical.')
+    setAns(r)
+    setL(false)
   }
+
   return (
     <div className="scard">
       <div className="stitle">Ask Seniors</div>
       <div className="ssub">AI pulls insights from the community to answer your questions honestly</div>
       <textarea className="ptxt" style={{height:100}} value={q} onChange={e=>setQ(e.target.value)} placeholder="e.g. Is hostel worth it at NIT Trichy? What is the real placement scenario for ECE at VIT?"/>
       <button className="pbtn" style={{marginTop:10,padding:'10px 22px'}} onClick={ask} disabled={loading}>
-        {loading?<><span className="spin"/>Finding insights…</>:'Ask the Community ✦'}
+        {loading ? 'Finding insights...' : 'Ask the Community'}
       </button>
-      {ans&&<div className="aibox" style={{marginTop:16}}>{ans}</div>}
+      {ans && <div className="aibox" style={{marginTop:16}}>{ans}</div>}
     </div>
   )
 }
@@ -467,18 +516,22 @@ function Profile({user,posts}:{user:User;posts:Post[]}) {
         <div>
           <div style={{fontFamily:'Syne',fontWeight:700,fontSize:20}}>{user.name}</div>
           <div style={{color:'var(--muted)',fontSize:13,marginTop:4}}>{user.college}</div>
-          <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>{user.year}{user.branch?' · '+user.branch:''}</div>
+          <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>{user.year}{user.branch?' - '+user.branch:''}</div>
         </div>
       </div>
       <div className="pmini">
-        {[['Posts',mine.length],['Likes',mine.reduce((s,p)=>s+p.likes,0)],['Replies',mine.reduce((s,p)=>s+(p.comments?.length||0),0)]].map(([l,n])=>(
-          <div className="pmini-box" key={String(l)}><div className="pmini-num">{n}</div><div className="pmini-lbl">{l}</div></div>
-        ))}
+        <div className="pmini-box"><div className="pmini-num">{mine.length}</div><div className="pmini-lbl">Posts</div></div>
+        <div className="pmini-box"><div className="pmini-num">{mine.reduce((s,p)=>s+p.likes,0)}</div><div className="pmini-lbl">Likes</div></div>
+        <div className="pmini-box"><div className="pmini-num">{mine.reduce((s,p)=>s+(p.comments?.length||0),0)}</div><div className="pmini-lbl">Replies</div></div>
       </div>
       <div style={{fontFamily:'Syne',fontWeight:600,fontSize:14,marginBottom:12}}>My Posts</div>
-      {mine.length
-        ?mine.map(p=><div key={p.id} style={{background:'var(--bg)',borderRadius:9,padding:13,marginBottom:10,fontSize:13,lineHeight:1.7,borderLeft:'3px solid var(--brand2)'}}>{p.text}<div style={{fontSize:11,color:'var(--muted)',marginTop:7}}>{ago(p.ts)} · ❤ {p.likes}</div></div>)
-        :<div style={{color:'var(--muted)',fontSize:13}}>No posts yet. Share your campus reality!</div>}
+      {mine.length === 0 && <div style={{color:'var(--muted)',fontSize:13}}>No posts yet. Share your campus reality!</div>}
+      {mine.map(p=>(
+        <div key={p.id} style={{background:'var(--bg)',borderRadius:9,padding:13,marginBottom:10,fontSize:13,lineHeight:1.7,borderLeft:'3px solid var(--brand2)'}}>
+          {p.text}
+          <div style={{fontSize:11,color:'var(--muted)',marginTop:7}}>{ago(p.ts)} - Likes: {p.likes}</div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -493,13 +546,15 @@ function Matcher() {
   async function match() {
     const p=parseFloat(pct)
     if(!p||p<0||p>100) return
-    setL(true); setRes([]); setMsg('')
-    const ans=await ai(`Student scored ${p} percentile in ${exam}. List exactly 4 realistic Indian colleges to target. Return ONLY valid JSON array, no markdown: [{"name":"College Name","type":"IIT/NIT/Deemed/State","city":"City","chance":"High/Medium/Low","detail":"one honest sentence about this college for this score"}]`)
-    try{
-      const clean=ans.replace(/```json|```/g,'').trim()
+    setL(true)
+    setRes([])
+    setMsg('')
+    const ans=await ai('Student scored '+p+' percentile in '+exam+'. List exactly 4 realistic Indian colleges to target. Return ONLY valid JSON array with no markdown formatting: [{"name":"College Name","type":"IIT or NIT or Deemed or State","city":"City Name","chance":"High or Medium or Low","detail":"one honest sentence about this college for this score"}]')
+    try {
+      const clean=ans.replace(/```json/g,'').replace(/```/g,'').trim()
       setRes(JSON.parse(clean))
-    }catch{
-      setMsg('Could not parse results. Try again.')
+    } catch {
+      setMsg('Could not load results. Please try again.')
     }
     setL(false)
   }
@@ -510,20 +565,23 @@ function Matcher() {
   return (
     <div className="rcard">
       <div className="rtitle"><i className="ti ti-calculator"/>JEE / NEET Matcher</div>
-      <div style={{fontSize:12,color:'var(--muted)',marginBottom:10}}>Enter percentile → see colleges you can get</div>
+      <div style={{fontSize:12,color:'var(--muted)',marginBottom:10}}>Enter percentile to see colleges you can get</div>
       <div className="jrow">
         <select className="jinp" value={exam} onChange={e=>setExam(e.target.value)} style={{maxWidth:110}}>
-          <option>JEE Mains</option><option>JEE Advanced</option><option>NEET</option><option>BITSAT</option>
+          <option>JEE Mains</option>
+          <option>JEE Advanced</option>
+          <option>NEET</option>
+          <option>BITSAT</option>
         </select>
         <input className="jinp" type="number" value={pct} onChange={e=>setPct(e.target.value)} placeholder="Percentile" style={{maxWidth:85}}/>
-        <button className="jbtn" onClick={match} disabled={loading}>{loading?'…':'Find →'}</button>
+        <button className="jbtn" onClick={match} disabled={loading}>{loading?'...':'Find'}</button>
       </div>
-      {loading&&<div style={{fontSize:12,color:'var(--muted)'}}><span className="spin"/>Finding colleges… (10-15 sec)</div>}
-      {msg&&<div style={{fontSize:12,color:'var(--brand2)'}}>{msg}</div>}
+      {loading && <div style={{fontSize:12,color:'var(--muted)'}}><span className="spin"/> Finding colleges...</div>}
+      {msg && <div style={{fontSize:12,color:'var(--brand2)'}}>{msg}</div>}
       {res.map((c,i)=>(
         <div className="cres" key={i}>
           <div className="cresname">{c.name}</div>
-          <div className="cressub">{c.city} · {c.type} · <strong style={{color:cc(c.chance)}}>{c.chance} chance</strong></div>
+          <div className="cressub">{c.city} - {c.type} - <strong style={{color:cc(c.chance)}}>{c.chance} chance</strong></div>
           <div className="cressub" style={{marginTop:3}}>{c.detail}</div>
           <div className="cbar"><div className="cfill" style={{width:cw(c.chance)+'%'}}/></div>
         </div>
@@ -536,19 +594,23 @@ function Counselor() {
   const [q,setQ]=useState('')
   const [ans,setAns]=useState('')
   const [loading,setL]=useState(false)
+
   async function ask() {
     if(!q.trim()) return
-    setL(true); setAns('')
+    setL(true)
+    setAns('')
     const r=await ai(q,'You are an honest knowledgeable Indian college counselor. Give practical direct advice about IITs, NITs, BITS and other Indian colleges in 3-5 sentences.')
-    setAns(r); setL(false)
+    setAns(r)
+    setL(false)
   }
+
   return (
     <div className="rcard">
       <div className="rtitle"><i className="ti ti-robot"/>AI Counselor</div>
-      <div style={{fontSize:12,color:'var(--muted)',marginBottom:9}}>Instant honest answers about admissions & colleges</div>
-      <textarea className="ptarea" value={q} onChange={e=>setQ(e.target.value)} placeholder="Which is better for CSE — NIT Trichy or BITS Pilani?"/>
-      <button className="pbtn2" onClick={ask} disabled={loading}>{loading?<><span className="spin"/>Thinking…</>:'Ask AI ✦'}</button>
-      {ans&&<div className="aibox">{ans}</div>}
+      <div style={{fontSize:12,color:'var(--muted)',marginBottom:9}}>Instant honest answers about admissions and colleges</div>
+      <textarea className="ptarea" value={q} onChange={e=>setQ(e.target.value)} placeholder="Which is better for CSE - NIT Trichy or BITS Pilani?"/>
+      <button className="pbtn2" onClick={ask} disabled={loading}>{loading?'Thinking...':'Ask AI'}</button>
+      {ans && <div className="aibox">{ans}</div>}
     </div>
   )
-      }
+}
