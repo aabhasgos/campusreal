@@ -370,7 +370,6 @@ function Card({post,user,posts,setPosts}:{post:Post;user:User;posts:Post[];setPo
     </div>
   )
 }
-
 function Explore({posts}:{posts:Post[]}) {
   const [filtered,setFiltered]=useState<Post[]|null>(null)
   const [name,setName]=useState('')
@@ -378,15 +377,16 @@ function Explore({posts}:{posts:Post[]}) {
     <div className="feed">
       <div style={{display:'flex',alignItems:'center',gap:10}}>
         <div style={{fontFamily:'Syne',fontWeight:700,fontSize:16}}>Posts about {name}</div>
-        <button onClick={()=>{setFiltered(null);setName('')}} style={{fontSize:12,background:'var(--border)',border:'none',borderRadius:6,padding:'4px 10px',cursor:'pointer'}}>← Back</button>
+        <button onClick={()=>{setFiltered(null);setName('')}} style={{fontSize:12,background:'var(--border)',border:'none',borderRadius:6,padding:'4px 10px',cursor:'pointer'}}>
+          Back
+        </button>
       </div>
       {filtered.length===0
-        ?<div className="scard" style={{textAlign:'center',color:'var(--muted)'}}>No posts yet for {name}. Be the first!</d>
-        <button onClick={()=>{setFiltered(null);setName('')}} style={{fontSize:12,background:'var(--border)',border:'none',borderRadius:6,padding:'4px 10px',cursor:'pointer'}}>← Back</button>
-      </div>
-      {filtered.length===0
-        ?<div className="scard" style={{textAlign:'center',color:'var(--muted)'}}>No posts yet for {name}. Be the first!</div>
-        :[...filtered].sort((a,b)=>b.ts-a.ts).map(p=><Card key={p.id} post={p} user={{id:'',name:'Guest',email:'',college:'',year:'',branch:''}} posts={posts} setPosts={()=>{}}/>)}
+        ? <div className="scard" style={{textAlign:'center',color:'var(--muted)'}}>No posts yet for {name}. Be the first!</div>
+        : [...filtered].sort((a,b)=>b.ts-a.ts).map(p=>(
+            <Card key={p.id} post={p} user={{id:'',name:'Guest',email:'',college:'',year:'',branch:''}} posts={posts} setPosts={()=>{}}/>
+          ))
+      }
     </div>
   )
   return (
@@ -400,7 +400,7 @@ function Explore({posts}:{posts:Post[]}) {
             <div className="etname">{c.name}</div>
             <div className="etsub">{c.city} · {c.type}</div>
             <div style={{marginTop:9,fontSize:12}}>⭐ {c.rating}/5</div>
-            <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>JEE cutoff ≈ {c.cutoff}%ile</div>
+            <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>JEE cutoff ~ {c.cutoff}%ile</div>
           </div>
         ))}
       </div>
