@@ -6,7 +6,16 @@ const gc = (s: string) => { let h = 0; for (const c of s) h = (h*31+c.charCodeAt
 const ini = (n: string) => n.split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,2)
 const ago = (ts: number) => { const d=Date.now()-ts; if(d<3.6e6) return Math.floor(d/60000)+'m ago'; if(d<864e5) return Math.floor(d/3.6e6)+'h ago'; return Math.floor(d/864e5)+'d ago' }
 
-const COLLEGES = [
+const PRESET_COLLEGES = [
+  'IIT Bombay','IIT Delhi','IIT Madras','IIT Kanpur','IIT Kharagpur',
+  'NIT Trichy','NIT Warangal','NIT Surathkal','BITS Pilani','BITS Goa',
+  'DTU Delhi','NSIT Delhi','COEP Pune','VIT Vellore','SRM Institute',
+  'Thapar University','Manipal Institute','RVCE Bangalore','PES University',
+  'Anna University','Jadavpur University','BIT Mesra','KIIT Bhubaneswar',
+  'Amity University','LPU','Chandigarh University','MIT Pune',
+]
+
+const COLLEGE_TILES = [
   {id:'iitb',name:'IIT Bombay',short:'IITB',city:'Mumbai',type:'IIT',cutoff:99.8,rating:4.9},
   {id:'iitd',name:'IIT Delhi',short:'IITD',city:'New Delhi',type:'IIT',cutoff:99.7,rating:4.8},
   {id:'iitm',name:'IIT Madras',short:'IITM',city:'Chennai',type:'IIT',cutoff:99.5,rating:4.9},
@@ -14,6 +23,7 @@ const COLLEGES = [
   {id:'nitw',name:'NIT Warangal',short:'NITW',city:'Warangal',type:'NIT',cutoff:96,rating:4.4},
   {id:'bits',name:'BITS Pilani',short:'BITS',city:'Pilani',type:'Deemed',cutoff:95,rating:4.6},
   {id:'dtu',name:'DTU Delhi',short:'DTU',city:'New Delhi',type:'State',cutoff:92,rating:4.3},
+  {id:'thapar',name:'Thapar University',short:'TU',city:'Patiala',type:'Deemed',cutoff:80,rating:4.1},
   {id:'vit',name:'VIT Vellore',short:'VIT',city:'Vellore',type:'Deemed',cutoff:78,rating:4.1},
   {id:'srm',name:'SRM Institute',short:'SRM',city:'Chennai',type:'Deemed',cutoff:70,rating:3.8},
 ]
@@ -22,11 +32,16 @@ type User = {id:string;name:string;email:string;college:string;year:string;branc
 type Comment = {author:string;text:string;ts:number;isAI?:boolean}
 type Post = {id:string;uid:string;college:string;type:string;text:string;likes:number;likedBy:string[];comments:Comment[];ts:number}
 
-async function ai(prompt: string, system?: string) {
-  const r = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,system})})
-  const d = await r.json()
-  if(!r.ok) throw new Error(d.error)
-  return d.text as string
+async function ai(prompt: string, system?: string): Promise<string> {
+  try {
+    const r = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,system}),signal:AbortSignal.timeout(25000)})
+    const d = await r.json()
+    if(!r.ok) throw new Error(d.error||'AI error')
+    return d.text as string
+  } catch(e:unknown) {
+    if(e instanceof Error && e.name==='TimeoutError') return 'Request timed out. Please try again.'
+    return 'AI unavailable right now. Please try again in a moment.'
+  }
 }
 
 async function db(body: Record<string,unknown>) {
@@ -52,15 +67,34 @@ export default function App() {
 
   function showToast(m: string){setToast(m);setToastOn(true);setTimeout(()=>setToastOn(false),2800)}
 
+  // Load saved session on startup
+  useEffect(()=>{
+    try {
+      const saved = localStorage.getItem('cr_user')
+      if(saved) { setUser(JSON.parse(saved)); setPage('app') }
+    } catch {}
+  },[])
+
   useEffect(()=>{
     if(page==='app') fetch('/api/storage?resource=posts').then(r=>r.json()).then(setPosts).catch(()=>{})
   },[page])
+
+  function saveUser(u: User) {
+    setUser(u)
+    try { localStorage.setItem('cr_user', JSON.stringify(u)) } catch {}
+  }
+
+  function logout() {
+    setUser(null)
+    try { localStorage.removeItem('cr_user') } catch {}
+    setPage('land')
+  }
 
   async function doLogin(){
     setAL(true)
     try{
       const d = await db({action:'login',email:le,pass:lp})
-      setUser(d.user); setPage('app')
+      saveUser(d.user); setPage('app')
     }catch(e:unknown){showToast(e instanceof Error&&e.message.includes('Invalid')?'Wrong email/password — try rohan@demo.com / demo':'Login failed')}
     setAL(false)
   }
@@ -70,7 +104,7 @@ export default function App() {
     setAL(true)
     try{
       const d = await db({action:'register',name:rn,email:re,college:rc,year:ry,branch:rb,pass:rp})
-      setUser(d.user); setPage('app'); showToast('Welcome '+rn+'! 🎉')
+      saveUser(d.user); setPage('app'); showToast('Welcome '+rn+'! 🎉')
     }catch(e:unknown){showToast(e instanceof Error?e.message:'Registration failed')}
     setAL(false)
   }
@@ -139,7 +173,7 @@ export default function App() {
             <>
               <div className="fg"><label className="fl">Full Name</label><input className="fi" value={rn} onChange={e=>setRN(e.target.value)} placeholder="Arjun Sharma"/></div>
               <div className="fg"><label className="fl">Email</label><input className="fi" type="email" value={re} onChange={e=>setRE(e.target.value)} placeholder="your@email.com"/></div>
-              <div className="fg"><label className="fl">College</label><input className="fi" value={rc} onChange={e=>setRC(e.target.value)} placeholder="IIT Bombay, NIT Trichy, VIT…"/></div>
+              <div className="fg"><label className="fl">College</label><input className="fi" value={rc} onChange={e=>setRC(e.target.value)} placeholder="IIT Bombay, NIT Trichy, Thapar…"/></div>
               <div className="fg"><label className="fl">Year</label>
                 <select className="fs" value={ry} onChange={e=>setRY(e.target.value)}>
                   <option value="">Select year</option>
@@ -168,7 +202,7 @@ export default function App() {
         <div className="logo">Campus<em>Real</em></div>
         <div className="nav-right">
           <span className="nav-greeting">Hey, {user?.name.split(' ')[0]}!</span>
-          <button className="nbtn" onClick={()=>{setUser(null);setPage('land')}}>Logout</button>
+          <button className="nbtn" onClick={logout}>Logout</button>
         </div>
       </nav>
       <div className="app">
@@ -199,6 +233,7 @@ export default function App() {
           <Matcher/>
           <div className="rcard">
             <div className="rtitle"><i className="ti ti-trending-up"/>Trending</div>
+            {trending.length===0&&<div style={{fontSize:13,color:'var(--muted)'}}>No posts yet — be the first!</div>}
             {trending.map(([name,score],i)=>(
               <div className="trow" key={name}>
                 <div className="tnum">{i+1}</div>
@@ -218,7 +253,9 @@ function Feed({user,posts,setPosts,showToast}:{user:User;posts:Post[];setPosts:(
   const [type,setType]=useState('review')
   const [college,setCollege]=useState('')
   const [busy,setBusy]=useState(false)
-  const cols=[...new Set([...COLLEGES.map(c=>c.name),...posts.map(p=>p.college)])].sort()
+
+  // Include preset + user's own college + colleges from posts — no duplicates
+  const cols=[...new Set([...PRESET_COLLEGES, user.college, ...posts.map(p=>p.college)])].filter(Boolean).sort()
 
   async function post() {
     if(!text.trim()){showToast('Write something first!');return}
@@ -228,7 +265,7 @@ function Feed({user,posts,setPosts,showToast}:{user:User;posts:Post[];setPosts:(
       const np:Post={id:'p'+Date.now(),uid:user.id,college:college||user.college,type,text:enhanced,likes:0,likedBy:[],comments:[],ts:Date.now()}
       await db({action:'createPost',post:np})
       setPosts([np,...posts]); setText(''); showToast('Posted! 🎉')
-    }catch{showToast('Post failed.')}
+    }catch{showToast('Post failed. Try again.')}
     setBusy(false)
   }
 
@@ -244,8 +281,8 @@ function Feed({user,posts,setPosts,showToast}:{user:User;posts:Post[];setPosts:(
             <option value="rank">🏆 Ranking</option>
           </select>
           <select className="sel" value={college} onChange={e=>setCollege(e.target.value)} style={{maxWidth:155}}>
-            <option value="">Select College</option>
-            {cols.map(c=><option key={c}>{c}</option>)}
+            <option value="">My College</option>
+            {cols.map(c=><option key={c} value={c}>{c}</option>)}
           </select>
           <button className="pbtn" onClick={post} disabled={busy}>{busy?'Posting…':'Post →'}</button>
         </div>
@@ -266,24 +303,28 @@ function Card({post,user,posts,setPosts}:{post:Post;user:User;posts:Post[];setPo
   const liked=post.likedBy?.includes(user.id)
 
   async function like() {
-    const d = await db({action:'likePost',postId:post.id,userId:user.id})
-    setPosts(posts.map(p=>p.id===post.id?{...p,likes:d.likes,likedBy:d.liked?[...(p.likedBy||[]),user.id]:p.likedBy.filter((x:string)=>x!==user.id)}:p))
+    try {
+      const d = await db({action:'likePost',postId:post.id,userId:user.id})
+      setPosts(posts.map(p=>p.id===post.id?{...p,likes:d.likes,likedBy:d.liked?[...(p.likedBy||[]),user.id]:p.likedBy.filter((x:string)=>x!==user.id)}:p))
+    } catch {}
   }
 
   async function comment() {
     if(!ct.trim()) return
     setCL(true)
-    const uc:Comment={author:user.name,text:ct,ts:Date.now()}
-    await db({action:'addComment',postId:post.id,comment:uc})
-    const updated=[...(post.comments||[]),uc]
-    setPosts(posts.map(p=>p.id===post.id?{...p,comments:updated}:p))
-    setCT('')
-    if(ct.includes('?')){
-      const rep = await ai(`Post from ${post.college}: "${post.text}"\nStudent asks: "${ct}"\nGive a brief honest 2-3 sentence reply as an experienced senior.`)
-      const ac:Comment={author:'AI Counselor',text:rep,ts:Date.now(),isAI:true}
-      await db({action:'addComment',postId:post.id,comment:ac})
-      setPosts(posts.map(p=>p.id===post.id?{...p,comments:[...updated,ac]}:p))
-    }
+    try {
+      const uc:Comment={author:user.name,text:ct,ts:Date.now()}
+      await db({action:'addComment',postId:post.id,comment:uc})
+      const updated=[...(post.comments||[]),uc]
+      setPosts(posts.map(p=>p.id===post.id?{...p,comments:updated}:p))
+      setCT('')
+      if(ct.includes('?')){
+        const rep = await ai(`Post from ${post.college}: "${post.text}"\nStudent asks: "${ct}"\nGive a brief honest 2-3 sentence reply as an experienced senior.`)
+        const ac:Comment={author:'AI Counselor',text:rep,ts:Date.now(),isAI:true}
+        await db({action:'addComment',postId:post.id,comment:ac})
+        setPosts(posts.map(p=>p.id===post.id?{...p,comments:[...updated,ac]}:p))
+      }
+    } catch {}
     setCL(false)
   }
 
@@ -340,7 +381,11 @@ function Explore({posts}:{posts:Post[]}) {
         <button onClick={()=>{setFiltered(null);setName('')}} style={{fontSize:12,background:'var(--border)',border:'none',borderRadius:6,padding:'4px 10px',cursor:'pointer'}}>← Back</button>
       </div>
       {filtered.length===0
-        ?<div className="scard" style={{textAlign:'center',color:'var(--muted)'}}>No posts yet. Be the first!</div>
+        ?<div className="scard" style={{textAlign:'center',color:'var(--muted)'}}>No posts yet for {name}. Be the first!</d>
+        <button onClick={()=>{setFiltered(null);setName('')}} style={{fontSize:12,background:'var(--border)',border:'none',borderRadius:6,padding:'4px 10px',cursor:'pointer'}}>← Back</button>
+      </div>
+      {filtered.length===0
+        ?<div className="scard" style={{textAlign:'center',color:'var(--muted)'}}>No posts yet for {name}. Be the first!</div>
         :[...filtered].sort((a,b)=>b.ts-a.ts).map(p=><Card key={p.id} post={p} user={{id:'',name:'Guest',email:'',college:'',year:'',branch:''}} posts={posts} setPosts={()=>{}}/>)}
     </div>
   )
@@ -349,7 +394,7 @@ function Explore({posts}:{posts:Post[]}) {
       <div className="stitle">Explore Colleges</div>
       <div className="ssub">Tap a college to see all community posts</div>
       <div className="egrid">
-        {COLLEGES.map(c=>(
+        {COLLEGE_TILES.map(c=>(
           <div className="etile" key={c.id} onClick={()=>{setFiltered(posts.filter(p=>p.college===c.name));setName(c.name)}}>
             <div className="eabbr">{c.short}</div>
             <div className="etname">{c.name}</div>
@@ -366,16 +411,25 @@ function Explore({posts}:{posts:Post[]}) {
 function Rankings() {
   const [result,setResult]=useState('')
   const [loading,setLoading]=useState(false)
-  useEffect(()=>{
-    setLoading(true)
-    ai('Rank top 8 Indian engineering colleges based on student satisfaction, real placements & campus life. Numbered list: "1. College — reason". Be concise and honest about drawbacks too.')
-      .then(setResult).finally(()=>setLoading(false))
-  },[])
+  const [error,setError]=useState('')
+
+  async function load() {
+    setLoading(true); setError(''); setResult('')
+    const r = await ai('Rank top 8 Indian engineering colleges based on student satisfaction, real placements & campus life. Numbered list: "1. College — reason". Be concise and honest about drawbacks too.')
+    if(r.includes('unavailable')||r.includes('timed out')) { setError(r) }
+    else { setResult(r) }
+    setLoading(false)
+  }
+
+  useEffect(()=>{ load() },[])
+
   return (
     <div className="scard">
       <div className="stitle">🏆 AI + Community Rankings</div>
       <div className="ssub">Honest rankings based on real student outcomes, not sponsorships</div>
-   {loading?<div style={{color:'var(--muted)',fontSize:13}}><span className="spin"/>Generating live rankings…</div>:<div style={{fontSize:14,lineHeight:2,whiteSpace:'pre-wrap'}}>{result}</div>}
+      {loading&&<div style={{color:'var(--muted)',fontSize:13}}><span className="spin"/>Generating live rankings… (may take 10-15 seconds)</div>}
+      {error&&<div style={{color:'var(--muted)',fontSize:13}}>{error} <button onClick={load} style={{color:'var(--brand2)',background:'none',border:'none',cursor:'pointer',fontWeight:600}}>Try again →</button></div>}
+      {result&&<div style={{fontSize:14,lineHeight:2,whiteSpace:'pre-wrap'}}>{result}</div>}
     </div>
   )
 }
@@ -388,7 +442,7 @@ function AskSeniors({posts}:{posts:Post[]}) {
     if(!q.trim()) return
     setL(true); setAns('')
     const ctx=posts.filter(p=>['review','tip'].includes(p.type)).slice(0,6).map(p=>`[${p.college}]: ${p.text}`).join('\n')
-    const r=await ai(`Student question: "${q}"\n\nCommunity posts:\n${ctx}\n\nAnswer using community insights and your knowledge. Be specific, honest, practical.`)
+    const r=await ai(`Student question: "${q}"\n\nCommunity posts for context:\n${ctx}\n\nAnswer using community insights and your knowledge of Indian colleges. Be specific, honest, practical.`)
     setAns(r); setL(false)
   }
   return (
@@ -396,7 +450,9 @@ function AskSeniors({posts}:{posts:Post[]}) {
       <div className="stitle">Ask Seniors</div>
       <div className="ssub">AI pulls insights from the community to answer your questions honestly</div>
       <textarea className="ptxt" style={{height:100}} value={q} onChange={e=>setQ(e.target.value)} placeholder="e.g. Is hostel worth it at NIT Trichy? What is the real placement scenario for ECE at VIT?"/>
-      <button className="pbtn" style={{marginTop:10,padding:'10px 22px'}} onClick={ask} disabled={loading}>{loading?<><span className="spin"/>Finding insights…</>:'Ask the Community ✦'}</button>
+      <button className="pbtn" style={{marginTop:10,padding:'10px 22px'}} onClick={ask} disabled={loading}>
+        {loading?<><span className="spin"/>Finding insights…</>:'Ask the Community ✦'}
+      </button>
       {ans&&<div className="aibox" style={{marginTop:16}}>{ans}</div>}
     </div>
   )
@@ -432,16 +488,25 @@ function Matcher() {
   const [pct,setPct]=useState('')
   const [res,setRes]=useState<{name:string;type:string;city:string;chance:string;detail:string}[]>([])
   const [loading,setL]=useState(false)
+  const [msg,setMsg]=useState('')
+
   async function match() {
     const p=parseFloat(pct)
     if(!p||p<0||p>100) return
-    setL(true); setRes([])
-    const ans=await ai(`Student scored ${p} percentile in ${exam}. List exactly 4 realistic Indian colleges. Return ONLY a JSON array: [{"name":"...","type":"IIT/NIT/Deemed/State","city":"...","chance":"High/Medium/Low","detail":"one honest line"}]`)
-    try{setRes(JSON.parse(ans.replace(/```json|```/g,'').trim()))}catch{setRes([])}
+    setL(true); setRes([]); setMsg('')
+    const ans=await ai(`Student scored ${p} percentile in ${exam}. List exactly 4 realistic Indian colleges to target. Return ONLY valid JSON array, no markdown: [{"name":"College Name","type":"IIT/NIT/Deemed/State","city":"City","chance":"High/Medium/Low","detail":"one honest sentence about this college for this score"}]`)
+    try{
+      const clean=ans.replace(/```json|```/g,'').trim()
+      setRes(JSON.parse(clean))
+    }catch{
+      setMsg('Could not parse results. Try again.')
+    }
     setL(false)
   }
+
   const cc=(c:string)=>c==='High'?'#10b981':c==='Medium'?'#f5a623':'#e94560'
   const cw=(c:string)=>c==='High'?85:c==='Medium'?55:30
+
   return (
     <div className="rcard">
       <div className="rtitle"><i className="ti ti-calculator"/>JEE / NEET Matcher</div>
@@ -453,7 +518,8 @@ function Matcher() {
         <input className="jinp" type="number" value={pct} onChange={e=>setPct(e.target.value)} placeholder="Percentile" style={{maxWidth:85}}/>
         <button className="jbtn" onClick={match} disabled={loading}>{loading?'…':'Find →'}</button>
       </div>
-      {loading&&<div style={{fontSize:12,color:'var(--muted)'}}><span className="spin"/>Finding colleges…</div>}
+      {loading&&<div style={{fontSize:12,color:'var(--muted)'}}><span className="spin"/>Finding colleges… (10-15 sec)</div>}
+      {msg&&<div style={{fontSize:12,color:'var(--brand2)'}}>{msg}</div>}
       {res.map((c,i)=>(
         <div className="cres" key={i}>
           <div className="cresname">{c.name}</div>
@@ -473,7 +539,7 @@ function Counselor() {
   async function ask() {
     if(!q.trim()) return
     setL(true); setAns('')
-    const r=await ai(q,'You are an honest knowledgeable Indian college counselor. Give practical direct advice in 3-5 sentences.')
+    const r=await ai(q,'You are an honest knowledgeable Indian college counselor. Give practical direct advice about IITs, NITs, BITS and other Indian colleges in 3-5 sentences.')
     setAns(r); setL(false)
   }
   return (
@@ -485,5 +551,4 @@ function Counselor() {
       {ans&&<div className="aibox">{ans}</div>}
     </div>
   )
-    }
-                        
+      }
