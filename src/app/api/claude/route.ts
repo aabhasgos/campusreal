@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -9,21 +8,37 @@ export async function POST(req: NextRequest) {
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }) }
 
   const { prompt, system } = body
-  if (!prompt || typeof prompt !== 'string')
-    return NextResponse.json({ error: 'Invalid prompt' }, { status: 400 })
+  if (!prompt) return NextResponse.json({ error: 'Invalid prompt' }, { status: 400 })
 
   try {
-    const genAI = new GoogleGenerativeAI(key)
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      systemInstruction: system ?? 'You are a helpful AI assistant for CampusReal, an honest Indian student college community.',
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          ...(system ? [{ role: 'system', content: system }] : []),
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 1000,
+        temperature: 0.7,
+      })
     })
-    const result = await model.generateContent(prompt)
-    const text = result.response.text()
+
+    const data = await response.json()
+    if (!response.ok) {
+      console.error('Groq error:', JSON.stringify(data))
+      return NextResponse.json({ error: data.error?.message || 'AI request failed' }, { status: 500 })
+    }
+
+    const text = data.choices?.[0]?.message?.content || ''
     return NextResponse.json({ text })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'AI request failed'
-    console.error('Gemini error:', msg)
+    console.error('Groq error:', msg)
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
